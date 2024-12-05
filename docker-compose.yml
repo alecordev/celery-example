@@ -1,0 +1,49 @@
+services:
+  redis:
+    build: 
+      context: ./src/redis
+      dockerfile: Dockerfile
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  producer:
+    build:
+      context: ./src/producer
+      dockerfile: Dockerfile
+    container_name: producer
+    command: python app.py
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+  consumer:
+    build:
+      context: ./src/consumer
+      dockerfile: Dockerfile
+    container_name: consumer
+    command: celery -A tasks worker --loglevel=info
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+  flower:
+    build:
+      context: ./src/flower
+      dockerfile: Dockerfile
+    container_name: flower
+    command: celery -A tasks flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./consumer:/app
+    working_dir: /app
+    depends_on:
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
